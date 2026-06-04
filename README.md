@@ -85,6 +85,53 @@ pltrace analyze trace.ftrace -p 12345 --gap-id 3
 pltrace gaps trace.ftrace
 ```
 
+## MCP Server（AI 助手集成）
+
+pltrace 可作为 MCP (Model Context Protocol) 服务器运行，让 AI 助手（如 Claude Code）直接调用 trace 分析能力。
+
+### 启动 MCP 服务器
+
+```bash
+# 直接运行
+python3 -m pltrace.mcp_server
+
+# 或安装后
+pltrace-mcp
+```
+
+### 在 Claude Code 中配置
+
+在 `~/.claude/settings.json` 或项目的 `.claude/settings.json` 中添加：
+
+```json
+{
+  "mcpServers": {
+    "pltrace": {
+      "command": "python3",
+      "args": ["-m", "pltrace.mcp_server"],
+      "cwd": "/path/to/pltrace"
+    }
+  }
+}
+```
+
+### 可用 MCP 工具
+
+| 工具 | 说明 |
+|------|------|
+| `trace_scan` | 扫描 trace 基本信息（事件类型、线程、时间范围） |
+| `trace_find_gaps` | 定位 dlopen 间隙，支持按线程名/PID 过滤 |
+| `trace_analyze_gap` | 完整分析 gap，输出状态分布 + I/O + 调度 + 结论 |
+| `trace_slice_gap` | 细粒度切割 gap，标注异常时间片 |
+
+### MCP 使用示例
+
+在 AI 助手中直接对话：
+
+> 帮我看下这个 trace 文件 `/path/to/trace.ftrace` 里 dlopen 之间的耗时是什么原因导致的？
+
+AI 会自动调用 `trace_find_gaps` 定位间隙，再调用 `trace_analyze_gap` 深度分析，最后给出结论。
+
 ## 输出文件
 
 `analyze` 命令在输出目录生成：

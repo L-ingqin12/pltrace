@@ -6,6 +6,7 @@ requires-python = ">=3.9"
 
 [project.scripts]
 pltrace = "pltrace.main:main"
+pltrace-mcp = "pltrace.mcp_server:main"
 
 [build-system]
 requires = ["setuptools>=64"]
