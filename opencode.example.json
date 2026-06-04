@@ -1,16 +1,18 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "pltrace": {
+    "pltrace-local": {
       "type": "local",
-      "command": [
-        "python3",
-        "-m",
-        "pltrace.mcp_server"
-      ],
+      "command": ["python3", "-m", "pltrace.mcp_server"],
       "environment": {},
       "enabled": true,
-      "description": "鸿蒙 bytrace/ftrace 快速间隙分析工具 - 自动判定 I/O 阻塞 vs CPU 抢占"
+      "description": "鸿蒙 bytrace/ftrace 快速间隙分析工具 (stdio)"
+    },
+    "pltrace-http": {
+      "type": "remote",
+      "url": "http://localhost:9020/mcp",
+      "enabled": false,
+      "description": "鸿蒙 bytrace/ftrace 快速间隙分析工具 (HTTP)"
     }
   }
 }

@@ -87,19 +87,31 @@ pltrace gaps trace.ftrace
 
 ## MCP Server（AI 助手集成）
 
-pltrace 可作为 MCP (Model Context Protocol) 服务器运行，让 AI 助手直接调用 trace 分析能力。兼容 **Claude Code**、**OpenCode** 以及所有支持 MCP 标准的客户端。
+pltrace 可作为 MCP 服务器运行，支持 **stdio** 和 **HTTP/SSE** 两种传输协议。
+兼容 **Claude Code**、**OpenCode** 以及所有支持 MCP 标准的客户端。
 
-### 启动 MCP 服务器
+### 启动方式
 
 ```bash
-# 直接运行
+# stdio 模式（默认，本地进程通信）
 python3 -m pltrace.mcp_server
 
-# 或安装后
-pltrace-mcp
+# HTTP 模式（远程调用、容器部署）
+python3 -m pltrace.mcp_server --http --port 9020
+python3 -m pltrace.mcp_server --http --host 0.0.0.0 --port 9020
 ```
 
-### 在 Claude Code 中配置
+HTTP 模式端点：
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/` | GET | 服务器信息和工具列表 |
+| `/health` | GET | 健康检查 |
+| `/mcp` | POST | JSON-RPC 请求（`Accept: application/json`） |
+| `/mcp` | POST | SSE 流式响应（`Accept: text/event-stream`） |
+| `/mcp` | GET | SSE 通道 |
+
+### 在 Claude Code 中配置（stdio）
 
 在 `~/.claude/settings.json` 或项目的 `.claude/settings.json` 中添加：
 
@@ -115,26 +127,38 @@ pltrace-mcp
 }
 ```
 
-配置文件参考：[claude-code.example.json](claude-code.example.json)
-
 ### 在 OpenCode 中配置
 
-在 `opencode.json` 或 `~/.config/opencode/opencode.json` 中添加：
+**本地模式（stdio）：**
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "pltrace": {
       "type": "local",
-      "command": [
-        "python3",
-        "-m",
-        "pltrace.mcp_server"
-      ],
-      "environment": {},
-      "enabled": true,
-      "description": "鸿蒙 bytrace/ftrace 快速间隙分析工具"
+      "command": ["python3", "-m", "pltrace.mcp_server"],
+      "enabled": true
+    }
+  }
+}
+```
+
+**远程模式（HTTP）：**
+
+```bash
+# 先在服务器上启动 HTTP 模式
+python3 -m pltrace.mcp_server --http --host 0.0.0.0 --port 9020
+```
+
+然后在 `opencode.json` 中配置：
+
+```json
+{
+  "mcp": {
+    "pltrace": {
+      "type": "remote",
+      "url": "http://localhost:9020/mcp",
+      "enabled": true
     }
   }
 }
@@ -142,15 +166,25 @@ pltrace-mcp
 
 配置文件参考：[opencode.example.json](opencode.example.json)
 
-**注意：OpenCode 与 Claude Code 的配置格式不同**：
+### 传输协议对比
+
+| | stdio | HTTP |
+|---|---|---|
+| 通信方式 | stdin/stdout 管道 | HTTP POST + SSE |
+| 适用场景 | 本地 IDE/CLI 集成 | 容器部署、远程调用 |
+| 启动方式 | `python3 -m pltrace.mcp_server` | `python3 -m pltrace.mcp_server --http` |
+| 并发支持 | 单连接 | 多连接（线程池） |
+
+### Claude Code vs OpenCode 配置差异
 
 | 配置项 | Claude Code | OpenCode |
 |--------|-------------|----------|
 | 顶层键 | `mcpServers` | `mcp` |
-| 命令格式 | `"command": "python3"` + `"args": ["-m", ...]` | `"command": ["python3", "-m", ...]` |
-| 服务器类型 | 无需声明 | `"type": "local"` (必填) |
+| 命令格式 | `"command": "python3"` + `"args": [...]` | `"command": ["python3", ...]` |
+| 服务器类型 | 无需声明 | `"type": "local"` / `"remote"` |
+| 远程 HTTP | 不支持 | `"type": "remote"` + `"url"` |
 | 环境变量 | `"env": {}` | `"environment": {}` |
-| 开关 | 无 | `"enabled": true` |
+| 开关 | 无 | `"enabled": true/false` |
 
 ### 可用 MCP 工具
 
