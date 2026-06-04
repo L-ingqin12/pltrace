@@ -91,9 +91,14 @@ class TraceGapFindResult:
 
 # ---- 事件名列表 ----
 SYSCALL_EXIT_EVENTS = {
+    # 标准 ftrace 事件
     "syscall_exit_openat", "syscall_exit_openat2",
     "sys_exit_openat", "sys_exit_openat2",
     "syscall_exit_open", "sys_exit_open",
+    # HiTrace 格式变体（trace_marker 写入的 dlopen 追踪点）
+    "tracing_mark_write",
+    # 可能出现在某些内核版本的变体
+    "syscall_exit_openat2",
 }
 
 SCHED_SWITCH = "sched_switch"

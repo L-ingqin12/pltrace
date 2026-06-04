@@ -1,13 +1,29 @@
-"""ftrace 文本格式解析器
+"""ftrace / hitrace 文本格式解析器
 
-支持 HarmonyOS bytrace 输出的 ftrace 格式，逐行流式解析，
-不一次性加载整个文件。兼容多种 bytrace 输出变体。
+支持 HarmonyOS bytrace / hitrace 输出的 ftrace 文本格式，
+逐行流式解析，不一次性加载整个文件。
+
+兼容:
+  - .ftrace     bytrace 文本输出
+  - .hitrace    hitrace 文本输出 (--text 模式)
+  - .ftrace.gz  压缩格式
+  - .hitrace.gz 压缩格式
 """
 
 import re
 import gzip
+import os
 from dataclasses import dataclass, field
 from typing import Iterator, Optional
+
+# 支持的文件扩展名
+SUPPORTED_EXTENSIONS = {".ftrace", ".hitrace", ".ftrace.gz", ".hitrace.gz"}
+
+# 二进制 hitrace 文件的魔数（protobuf 或 SysTace 头部）
+BINARY_SIGNATURES = [
+    b"\x0a",  # protobuf field 1 varint
+    b"\x0a\x08",  # 常见 trace packet 开头
+]
 
 
 @dataclass
@@ -63,17 +79,18 @@ class TraceEvent:
         return self.event_name.startswith("binder_")
 
 
-# ---- ftrace 行正则 ----
+# ---- ftrace / hitrace 行正则 ----
 # 格式:  <comm>-<pid>  [<cpu>] <flags> <timestamp>: <event>: <data>
 # 例:    my_thread-12345 [002] d..2.  456.789012: sched_switch: prev_comm=...
+# HiTrace 事件可能含 : 或 |，如 H:HITRACE_BEGIN, B:|my_span
 
 FTRACE_LINE_RE = re.compile(
-    r"^\s*"                                         # 前导空白
-    r"(?P<task_pid>.+?)\s+"                           # 任务-PID（含可能的空格）
+    r"^\s*"                                           # 前导空白
+    r"(?P<task_pid>.+?)\s+"                           # 任务-PID
     r"\[(?P<cpu>\d+)\]\s+"                            # CPU 号
     r"(?P<flags>[a-zA-Z0-9_\.\+#]+)\s+"               # 标志位
     r"(?P<timestamp>[\d]+\.[\d]+):\s+"                # 时间戳
-    r"(?P<event>[a-zA-Z0-9_]+):\s*"                   # 事件名
+    r"(?P<event>[a-zA-Z0-9_:|]+?):\s*"                # 事件名（支持 HiTrace 前缀）
     r"(?P<data>.*?)$"                                  # 事件数据（到行尾）
 )
 
@@ -147,15 +164,62 @@ def parse_line(line: str) -> Optional[TraceEvent]:
     )
 
 
+def _detect_format(filepath: str) -> str:
+    """检测 trace 文件格式：'text' (ftrace) 或 'binary' (protobuf/SysTace)"""
+    opener = gzip.open if filepath.endswith(".gz") else open
+    with opener(filepath, "rb") as f:
+        head = f.read(4)
+    # 文本格式以空白或 # 开头
+    if head and (head[0:1] in (b" ", b"\t", b"#") or head[0:1].isascii() and head[0:1].isalpha()):
+        return "text"
+    # 二进制格式检测（protobuf 开头）
+    for sig in BINARY_SIGNATURES:
+        if head.startswith(sig):
+            return "binary"
+    # 默认尝试按文本处理
+    return "text"
+
+
 def iter_events(filepath: str, event_filter: Optional[set] = None) -> Iterator[TraceEvent]:
     """流式读取 trace 文件，逐行返回 TraceEvent
 
-    Args:
-        filepath: trace 文件路径，支持 .gz 压缩
-        event_filter: 如果指定，只返回事件名在此集合内的记录
-    """
-    opener = gzip.open if filepath.endswith(".gz") else open
+    支持格式:
+      - .ftrace / .hitrace           文本格式
+      - .ftrace.gz / .hitrace.gz       gzip 压缩
+      - 自动检测文本/二进制，二进制会抛出 ValueError
 
+    Args:
+        filepath: trace 文件路径
+        event_filter: 如果指定，只返回事件名在此集合内的记录
+
+    Raises:
+        ValueError: 检测到二进制格式（需要使用 hitrace --text 转换）
+        FileNotFoundError: 文件不存在
+    """
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"文件不存在: {filepath}")
+
+    ext = os.path.splitext(filepath)[-1] if filepath.endswith(".gz") else os.path.splitext(filepath)[-1]
+    # 对 .gz 取双扩展名
+    if filepath.endswith(".gz"):
+        base = filepath[:-3]
+        ext = os.path.splitext(base)[-1] + ".gz"
+
+    if ext not in SUPPORTED_EXTENSIONS:
+        # 不做严格校验，允许用户传入任何扩展名（可能是符号链接等）
+        pass
+
+    fmt = _detect_format(filepath)
+    if fmt == "binary":
+        raise ValueError(
+            f"检测到二进制格式 trace 文件: {filepath}\n"
+            f"二进制 .hitrace 文件不支持直接解析。请用以下命令转换为文本格式：\n"
+            f"  hitrace --text -o output.ftrace --trace_file {filepath}\n"
+            f"  或重新抓取: bytrace -t 10 -b 16384 sched freq block disk > trace.ftrace"
+        )
+
+    opener = gzip.open if filepath.endswith(".gz") else open
+    line_count = 0
     with opener(filepath, "rt", encoding="utf-8", errors="replace") as f:
         buf = ""
         while True:
@@ -171,13 +235,21 @@ def iter_events(filepath: str, event_filter: Optional[set] = None) -> Iterator[T
                     continue
                 if event_filter and ev.event_name not in event_filter:
                     continue
+                line_count += 1
                 yield ev
 
         # 处理最后一行
         if buf.strip():
             ev = parse_line(buf)
             if ev and (not event_filter or ev.event_name in event_filter):
+                line_count += 1
                 yield ev
+
+    if line_count == 0:
+        raise ValueError(
+            f"未能从文件中解析到任何 trace 事件: {filepath}\n"
+            f"请确认文件是 bytrace/hitrace --text 输出的文本格式。"
+        )
 
 
 def scan_events(filepath: str) -> dict:

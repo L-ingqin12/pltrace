@@ -241,9 +241,22 @@ Running > 60%      → SELF_WORK     (自身业务)
 
 ## 支持格式
 
-- bytrace 文本输出 (.ftrace)
-- gzip 压缩的 trace (.ftrace.gz)
-- 兼容标准 ftrace trace-cmd 格式
+| 格式 | 扩展名 | 说明 |
+|------|--------|------|
+| bytrace 文本 | `.ftrace` | bytrace 默认输出 |
+| hitrace 文本 | `.hitrace` | hitrace --text 输出 |
+| gzip 压缩 | `.ftrace.gz` / `.hitrace.gz` | 压缩格式（自动解压） |
+| 二进制 | — | 不支持，请用 `hitrace --text` 转换 |
+
+**二进制 .hitrace 文件的处理：**
+
+如果遇到二进制格式（protobuf），工具会给出明确的转换提示：
+```
+ValueError: 检测到二进制格式 trace 文件。
+请用以下命令转换为文本格式：
+  hitrace --text -o output.ftrace --trace_file <file>
+  或重新抓取: bytrace -t 10 -b 16384 sched freq block disk > trace.ftrace
+```
 
 ## 测试
 

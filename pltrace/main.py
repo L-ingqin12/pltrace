@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""pltrace - 鸿蒙 bytrace/ftrace 快速间隙分析工具
+"""pltrace - 鸿蒙 bytrace/ftrace/hitrace 快速间隙分析工具
+
+支持格式:
+    .ftrace   — bytrace 文本输出
+    .hitrace  — hitrace 文本输出 (--text 模式)
+    .ftrace.gz / .hitrace.gz — gzip 压缩格式
 
 Usage:
     pltrace scan <trace_file>                        # 扫描 trace 基本信息
@@ -12,8 +17,9 @@ Usage:
 
 Examples:
     pltrace scan trace.ftrace
+    pltrace scan trace.hitrace
     pltrace gaps trace.ftrace --thread my_worker
-    pltrace gaps trace.ftrace --pid 12345
+    pltrace gaps trace.hitrace --pid 12345
     pltrace analyze trace.ftrace --thread my_worker
     pltrace analyze trace.ftrace --gap-id 3
     pltrace slice trace.ftrace --gap-id 3 --size 20
@@ -251,7 +257,7 @@ def main():
 
     # scan
     p_scan = sub.add_parser("scan", help="扫描 trace 基本信息（事件类型、线程、时间范围）")
-    p_scan.add_argument("trace_file", help="trace 文件路径 (.ftrace 或 .gz)")
+    p_scan.add_argument("trace_file", help="trace 文件路径 (.ftrace / .hitrace / .gz)")
 
     # gaps
     p_gaps = sub.add_parser("gaps", help="查找 dlopen 间隙（列出所有间隙的位置和耗时）")
