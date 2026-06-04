@@ -87,7 +87,7 @@ pltrace gaps trace.ftrace
 
 ## MCP Server（AI 助手集成）
 
-pltrace 可作为 MCP (Model Context Protocol) 服务器运行，让 AI 助手（如 Claude Code）直接调用 trace 分析能力。
+pltrace 可作为 MCP (Model Context Protocol) 服务器运行，让 AI 助手直接调用 trace 分析能力。兼容 **Claude Code**、**OpenCode** 以及所有支持 MCP 标准的客户端。
 
 ### 启动 MCP 服务器
 
@@ -115,6 +115,43 @@ pltrace-mcp
 }
 ```
 
+配置文件参考：[claude-code.example.json](claude-code.example.json)
+
+### 在 OpenCode 中配置
+
+在 `opencode.json` 或 `~/.config/opencode/opencode.json` 中添加：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "pltrace": {
+      "type": "local",
+      "command": [
+        "python3",
+        "-m",
+        "pltrace.mcp_server"
+      ],
+      "environment": {},
+      "enabled": true,
+      "description": "鸿蒙 bytrace/ftrace 快速间隙分析工具"
+    }
+  }
+}
+```
+
+配置文件参考：[opencode.example.json](opencode.example.json)
+
+**注意：OpenCode 与 Claude Code 的配置格式不同**：
+
+| 配置项 | Claude Code | OpenCode |
+|--------|-------------|----------|
+| 顶层键 | `mcpServers` | `mcp` |
+| 命令格式 | `"command": "python3"` + `"args": ["-m", ...]` | `"command": ["python3", "-m", ...]` |
+| 服务器类型 | 无需声明 | `"type": "local"` (必填) |
+| 环境变量 | `"env": {}` | `"environment": {}` |
+| 开关 | 无 | `"enabled": true` |
+
 ### 可用 MCP 工具
 
 | 工具 | 说明 |
@@ -126,7 +163,7 @@ pltrace-mcp
 
 ### MCP 使用示例
 
-在 AI 助手中直接对话：
+配置后，在 AI 助手中直接对话：
 
 > 帮我看下这个 trace 文件 `/path/to/trace.ftrace` 里 dlopen 之间的耗时是什么原因导致的？
 
