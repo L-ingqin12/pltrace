@@ -261,13 +261,13 @@ def main():
 
     # gaps
     p_gaps = sub.add_parser("gaps", help="查找 dlopen 间隙（列出所有间隙的位置和耗时）")
-    p_gaps.add_argument("trace_file")
+    p_gaps.add_argument("trace_file", help="trace 文件路径 (.ftrace / .hitrace / .gz)")
     _add_target_args(p_gaps)
     p_gaps.add_argument("--output", "-o", help="JSON 导出路径")
 
     # analyze
     p_analyze = sub.add_parser("analyze", help="完整分析间隙（状态分布 + I/O + 调度 + 结论）")
-    p_analyze.add_argument("trace_file")
+    p_analyze.add_argument("trace_file", help="trace 文件路径 (.ftrace / .hitrace / .gz)")
     _add_target_args(p_analyze)
     p_analyze.add_argument("--gap-id", type=int, help="只分析指定 gap")
     p_analyze.add_argument("--output-dir", "-o", default="pltrace_output",
@@ -275,7 +275,7 @@ def main():
 
     # slice
     p_slice = sub.add_parser("slice", help="切割间隙为子切片（细粒度时间线）")
-    p_slice.add_argument("trace_file")
+    p_slice.add_argument("trace_file", help="trace 文件路径 (.ftrace / .hitrace / .gz)")
     _add_target_args(p_slice)
     p_slice.add_argument("--gap-id", type=int, required=True, help="目标 gap ID")
     p_slice.add_argument("--size", type=int, default=20, help="子切片大小 (ms, 默认 20)")
