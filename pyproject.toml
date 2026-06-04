@@ -1,0 +1,12 @@
+[project]
+name = "pltrace"
+version = "1.0.0"
+description = "鸿蒙 bytrace/ftrace 快速间隙分析工具"
+requires-python = ">=3.9"
+
+[project.scripts]
+pltrace = "pltrace.main:main"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"

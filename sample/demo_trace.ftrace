@@ -1,0 +1,27 @@
+# tracer: nop
+#
+  dlopen_thread-12345     [002] d..2.   100.000000: syscall_exit_openat: ret=3
+  dlopen_thread-12345     [002] d..2.   100.000100: syscall_exit_mmap: ret=0x7f000000
+  dlopen_thread-12345     [002] d..2.   100.000600: syscall_exit_mmap: ret=0x7f000000
+  dlopen_thread-12345     [002] d..2.   100.001100: syscall_exit_mmap: ret=0x7f000000
+  dlopen_thread-12345     [002] d..2.   100.001600: syscall_exit_mmap: ret=0x7f000000
+  dlopen_thread-12345     [002] d..2.   100.002100: syscall_exit_mmap: ret=0x7f000000
+  dlopen_thread-12345     [002] d..2.   100.017600: sched_switch: prev_comm=dlopen_thread prev_pid=12345 prev_prio=120 prev_state=2 ==> next_comm=swapper/2 next_pid=0
+  mmcqd/0-   89     [002] ....   100.017700: block_rq_issue: dev=179,0 sector=654321 nr_sector=16 rw=0 comm=dlopen_thread
+  mmcqd/0-   89     [002] ....   100.047700: block_rq_complete: dev=179,0 sector=654321 nr_sector=16 rw=0
+  swapper/2-    0     [002] d..2.   100.047800: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0 ==> next_comm=dlopen_thread next_pid=12345
+  dlopen_thread-12345     [002] d..2.   100.047900: syscall_exit_mmap: ret=0x7f001000
+  swapper/2-    0     [002] d..2.   100.052900: sched_waking: comm=heavy_worker pid=67890 prio=90 target_cpu=2
+  dlopen_thread-12345     [002] d..2.   100.053000: sched_switch: prev_comm=dlopen_thread prev_pid=12345 prev_prio=120 prev_state=0 ==> next_comm=heavy_worker next_pid=67890
+  heavy_worker-67890     [002] d..2.   100.053100: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.058100: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.063100: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.068100: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.073100: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.078100: syscall_exit_write: ret=4096
+  swapper/2-    0     [002] d..2.   100.083100: sched_switch: prev_comm=heavy_worker prev_pid=67890 prev_prio=120 prev_state=1 ==> next_comm=dlopen_thread next_pid=12345
+  <...>-    0     [002] ....   100.073100: irq_handler_entry: irq=42 name=mmc0
+  <...>-    0     [002] ....   100.074100: irq_handler_exit: irq=42 ret=handled
+  <...>-    0     [002] ....   100.063100: cpu_frequency: state=1500000 cpu_id=2
+  <...>-    0     [002] ....   100.078100: cpu_frequency: state=900000 cpu_id=2
+  dlopen_thread-12345     [002] d..2.   100.085100: syscall_exit_openat: ret=4

@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+sample/output*/
+sample/output_*/
+pltrace_output/
+*.egg-info/
+dist/

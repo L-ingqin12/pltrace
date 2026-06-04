@@ -1,0 +1,17 @@
+# tracer: nop
+#
+  dlopen_thread-12345     [002] d..2.   100.000000: syscall_exit_openat: ret=3
+  dlopen_thread-12345     [002] d..2.   100.000100: sched_switch: prev_comm=dlopen_thread prev_pid=12345 prev_prio=120 prev_state=2 ==> next_comm=swapper/2 next_pid=0
+  mmcqd/0-   89     [002] ....   100.000200: block_bio_queue: dev=179,0 sector=123456 nr_sector=8 rw=0 comm=dlopen_thread
+  mmcqd/0-   89     [002] ....   100.000300: block_rq_issue: dev=179,0 sector=123456 nr_sector=8 rw=0 comm=dlopen_thread
+  mmcqd/0-   89     [002] ....   100.040400: block_rq_complete: dev=179,0 sector=123456 nr_sector=8 rw=0
+  swapper/2-    0     [002] d..2.   100.040500: sched_waking: comm=dlopen_thread pid=12345 prio=120 target_cpu=2
+  swapper/2-    0     [002] d..2.   100.040600: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0 ==> next_comm=dlopen_thread next_pid=12345
+  dlopen_thread-12345     [002] d..2.   100.040700: syscall_exit_read: ret=4096
+  dlopen_thread-12345     [002] d..2.   100.041700: sched_switch: prev_comm=dlopen_thread prev_pid=12345 prev_prio=120 prev_state=2 ==> next_comm=swapper/2 next_pid=0
+  mmcqd/0-   89     [002] ....   100.041800: block_rq_issue: dev=179,0 sector=123464 nr_sector=8 rw=0 comm=dlopen_thread
+  mmcqd/0-   89     [002] ....   100.056800: block_rq_complete: dev=179,0 sector=123464 nr_sector=8 rw=0
+  swapper/2-    0     [002] d..2.   100.056900: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0 ==> next_comm=dlopen_thread next_pid=12345
+  <...>-    0     [002] ....   100.036900: cpu_frequency: state=1800000 cpu_id=2
+  <...>-    0     [002] ....   100.046900: cpu_frequency: state=1200000 cpu_id=2
+  dlopen_thread-12345     [002] d..2.   100.085100: syscall_exit_openat: ret=4

@@ -1,0 +1,36 @@
+# tracer: nop
+#
+  dlopen_thread-12345     [002] d..2.   100.000000: syscall_exit_openat: ret=3
+  swapper/2-    0     [002] d..2.   100.000100: sched_waking: comm=heavy_worker pid=67890 prio=90 target_cpu=2
+  dlopen_thread-12345     [002] d..2.   100.000200: sched_switch: prev_comm=dlopen_thread prev_pid=12345 prev_prio=120 prev_state=0 ==> next_comm=heavy_worker next_pid=67890
+  heavy_worker-67890     [002] d..2.   100.000300: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.000400: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.005100: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.005200: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.009900: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.010000: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.014700: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.014800: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.019500: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.019600: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.024300: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.024400: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.029100: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.029200: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.033900: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.034000: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.038700: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.038800: syscall_exit_futex: ret=0
+  heavy_worker-67890     [002] d..2.   100.043500: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.043600: syscall_exit_futex: ret=0
+  swapper/2-    0     [002] d..2.   100.048300: sched_switch: prev_comm=heavy_worker prev_pid=67890 prev_prio=120 prev_state=1 ==> next_comm=dlopen_thread next_pid=12345
+  dlopen_thread-12345     [002] d..2.   100.048400: syscall_exit_read: ret=1024
+  dlopen_thread-12345     [002] d..2.   100.049400: sched_switch: prev_comm=dlopen_thread prev_pid=12345 prev_prio=120 prev_state=0 ==> next_comm=heavy_worker next_pid=67890
+  heavy_worker-67890     [002] d..2.   100.049500: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.054500: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.059500: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.064500: syscall_exit_write: ret=4096
+  heavy_worker-67890     [002] d..2.   100.069500: syscall_exit_write: ret=4096
+  swapper/2-    0     [002] d..2.   100.074500: sched_switch: prev_comm=heavy_worker prev_pid=67890 prev_prio=120 prev_state=1 ==> next_comm=dlopen_thread next_pid=12345
+  <...>-    0     [002] ....   100.044500: cpu_frequency: state=2000000 cpu_id=2
+  dlopen_thread-12345     [002] d..2.   100.085100: syscall_exit_openat: ret=4
