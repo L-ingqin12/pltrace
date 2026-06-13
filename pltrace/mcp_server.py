@@ -89,7 +89,7 @@ TOOLS = [
             "properties": {
                 "trace_file": {
                     "type": "string",
-                    "description": "trace 文件路径（支持 .ftrace / .hitrace / .ftrace.gz / .hitrace.gz）",
+                    "description": "trace 文件路径（支持 .ftrace / .hitrace / .sys / .htrace / .gz）",
                 },
             },
             "required": ["trace_file"],

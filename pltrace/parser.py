@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Iterator, Optional
 
 # 支持的文件扩展名
-SUPPORTED_EXTENSIONS = {".ftrace", ".hitrace", ".ftrace.gz", ".hitrace.gz"}
+SUPPORTED_EXTENSIONS = {".ftrace", ".hitrace", ".ftrace.gz", ".hitrace.gz", ".sys", ".htrace"}
 
 # 二进制 hitrace 文件的魔数（protobuf 或 SysTace 头部）
 BINARY_SIGNATURES = [
@@ -180,6 +180,41 @@ def _detect_format(filepath: str) -> str:
     return "text"
 
 
+def _raise_sys_guidance(filepath: str):
+    """针对 .sys/.htrace 文件给出转换指导"""
+    from .sys_parser import detect_trace_streamer
+
+    ts_path = detect_trace_streamer()
+    file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+
+    guidance = [
+        f"检测到二进制 HiProfiler trace 文件: {filepath}",
+        f"文件大小: {file_size_mb:.1f} MB",
+        f"",
+    ]
+
+    if ts_path:
+        guidance.append(f"✅ 检测到 trace_streamer: {ts_path}")
+        guidance.append(f"   请使用以下命令转换：")
+        guidance.append(f"   trace_streamer {filepath} -e output.db")
+        guidance.append(f"   然后运行: pltrace analyze output.db")
+        guidance.append(f"")
+        guidance.append(f"   或直接运行: pltrace comprehensive {filepath}")
+        guidance.append(f"   (pltrace 将自动调用 trace_streamer 转换)")
+    else:
+        guidance.append(f"❌ 未检测到 trace_streamer")
+        guidance.append(f"   请安装 trace_streamer:")
+        guidance.append(f"   1. 下载: https://gitee.com/openharmony/developtools_smartperf_host/releases")
+        guidance.append(f"   2. 解压: unzip trace_streamer_binary.zip")
+        guidance.append(f"   3. 运行: ./trace_streamer {filepath} -e output.db")
+        guidance.append(f"")
+        guidance.append(f"   替代方案: 使用 bytrace 重新抓取文本格式 trace:")
+        guidance.append(f"   hdc shell \"bytrace -t 10 -b 16384 sched freq block disk > /data/local/tmp/trace.ftrace\"")
+        guidance.append(f"   hdc file recv /data/local/tmp/trace.ftrace .")
+
+    raise ValueError("\n".join(guidance))
+
+
 def iter_events(filepath: str, event_filter: Optional[set] = None) -> Iterator[TraceEvent]:
     """流式读取 trace 文件，逐行返回 TraceEvent
 
@@ -209,14 +244,19 @@ def iter_events(filepath: str, event_filter: Optional[set] = None) -> Iterator[T
         # 不做严格校验，允许用户传入任何扩展名（可能是符号链接等）
         pass
 
+    is_sys = ext in {".sys", ".htrace"} or filepath.endswith(".sys") or filepath.endswith(".htrace")
+
     fmt = _detect_format(filepath)
     if fmt == "binary":
-        raise ValueError(
-            f"检测到二进制格式 trace 文件: {filepath}\n"
-            f"二进制 .hitrace 文件不支持直接解析。请用以下命令转换为文本格式：\n"
-            f"  hitrace --text -o output.ftrace --trace_file {filepath}\n"
-            f"  或重新抓取: bytrace -t 10 -b 16384 sched freq block disk > trace.ftrace"
-        )
+        if is_sys:
+            _raise_sys_guidance(filepath)
+        else:
+            raise ValueError(
+                f"检测到二进制格式 trace 文件: {filepath}\n"
+                f"二进制 .hitrace 文件不支持直接解析。请用以下命令转换为文本格式：\n"
+                f"  hitrace --text -o output.ftrace --trace_file {filepath}\n"
+                f"  或重新抓取: bytrace -t 10 -b 16384 sched freq block disk > trace.ftrace"
+            )
 
     opener = gzip.open if filepath.endswith(".gz") else open
     line_count = 0

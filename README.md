@@ -286,18 +286,44 @@ Running > 60%      → SELF_WORK     (自身业务)
 |------|--------|------|
 | bytrace 文本 | `.ftrace` | bytrace 默认输出 |
 | hitrace 文本 | `.hitrace` | hitrace --text 输出 |
+| HiProfiler 二进制 | `.sys` / `.htrace` | 需 `trace_streamer` 转换 |
 | gzip 压缩 | `.ftrace.gz` / `.hitrace.gz` | 压缩格式（自动解压） |
-| 二进制 | — | 不支持，请用 `hitrace --text` 转换 |
 
-**二进制 .hitrace 文件的处理：**
+### .sys / .htrace 二进制文件 🆕
 
-如果遇到二进制格式（protobuf），工具会给出明确的转换提示：
+HarmonyOS HiProfiler 产出的 `.sys` 二进制 trace 需要 `trace_streamer` 转换。
+
+**自动检测 `trace_streamer`**：
+如果 `trace_streamer` 在 PATH 中或已安装，pltrace 会提示可用。
+
+**转换方法 1 — 安装 trace_streamer**：
+
+```bash
+# 下载
+wget https://gitee.com/openharmony/developtools_smartperf_host/releases/download/v5.0.0/trace_streamer_binary.zip
+unzip trace_streamer_binary.zip
+
+# 转换 .sys → .db
+./trace_streamer trace.sys -e trace.db
+
+# 然后在 SmartPerf Host 中打开 trace.db 进行分析
 ```
-ValueError: 检测到二进制格式 trace 文件。
-请用以下命令转换为文本格式：
-  hitrace --text -o output.ftrace --trace_file <file>
-  或重新抓取: bytrace -t 10 -b 16384 sched freq block disk > trace.ftrace
+
+**转换方法 2 — 使用 bytrace 重新抓取文本格式**：
+
+```bash
+# 文本格式 trace 直接可分析，无需转换
+hdc shell "bytrace -t 10 -b 16384 sched freq block disk > /data/local/tmp/trace.ftrace"
+hdc file recv /data/local/tmp/trace.ftrace .
 ```
+
+**元能力说明**：
+
+HiProfiler 通过 OpenHarmony `developtools_smartperf_host` 仓库提供公开的 `trace_streamer` 工具用于格式转换。该工具支持 Windows / Linux / macOS，将二进制 trace 转为 SQLite 数据库后，可通过标准 SQL 查询调度、I/O、帧率等数据。pltrace 的 `sys_parser.py` 模块封装了此流程。
+
+### 二进制文件处理
+
+如果遇到二进制格式，工具会自动检测并给出转换指引。`.sys`/`.htrace` 文件会提示 `trace_streamer` 安装/使用方法，其他格式会提示使用对应工具转换。
 
 ## 测试
 
