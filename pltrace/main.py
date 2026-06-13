@@ -38,6 +38,7 @@ from pltrace.analyzer import find_gaps, analyze_gap, split_gap_into_slices
 from pltrace.reporter import generate_summary_report, generate_gap_report, export_gap_json
 from pltrace.comprehensive import run_comprehensive_analysis
 from pltrace.templates import TEMPLATES
+from pltrace.plugins import list_plugins as list_all_plugins, get_plugin
 
 
 def _resolve_target(args):
@@ -307,6 +308,29 @@ def cmd_template(args):
         print(f"\n{result.detail}")
 
 
+def cmd_plugins(args):
+    """列出已安装的格式解析插件"""
+    plugins = list_all_plugins()
+    if not plugins:
+        print("未发现任何插件。")
+        return
+
+    print(f"已安装 {len(plugins)} 个插件:\n")
+    print(f"  {'名称':<12} {'扩展名':<25} {'可用':<6} {'优先级':<8} {'说明'}")
+    print(f"  {'-'*72}")
+    for p in plugins:
+        status = "✅" if p["available"] else "❌"
+        exts = ", ".join(p["extensions"])
+        builtin = "(内置)" if p["builtin"] else "(用户)"
+        print(f"  {p['name']:<12} {exts:<25} {status:<6} {p['priority']:<8} {p['description']} {builtin}")
+        if not p["available"]:
+            print(f"    {'':>12} 依赖: {p['dependency_status']}")
+
+    if args.verbose:
+        print(f"\n用户插件目录: ~/.pltrace/plugins/")
+        print(f"内置插件目录: pltrace/plugins/")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="pltrace - 鸿蒙 ftrace/hitrace 全维度性能分析工具",
@@ -366,6 +390,10 @@ def main():
     p_tmpl.add_argument("--thread", "-t", help="目标线程名")
     p_tmpl.add_argument("--render-thread", help="渲染线程名 (frame 模板, 默认 RSMainThread)")
 
+    # plugins
+    p_plugs = sub.add_parser("plugins", help="列出已安装的格式解析插件")
+    p_plugs.add_argument("--verbose", "-v", action="store_true", help="显示详细信息")
+
     args = parser.parse_args()
 
     if args.command == "scan":
@@ -380,6 +408,8 @@ def main():
         cmd_comprehensive(args)
     elif args.command == "template":
         cmd_template(args)
+    elif args.command == "plugins":
+        cmd_plugins(args)
     else:
         parser.print_help()
 

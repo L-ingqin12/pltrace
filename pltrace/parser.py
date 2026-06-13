@@ -1,29 +1,19 @@
-"""ftrace / hitrace 文本格式解析器
+"""trace 事件解析器（插件架构）
 
-支持 HarmonyOS bytrace / hitrace 输出的 ftrace 文本格式，
-逐行流式解析，不一次性加载整个文件。
+通过插件系统自动适配多种 trace 格式：
+  - .ftrace / .hitrace — 文本格式（ftrace 插件）
+  - .sys / .htrace     — 二进制格式（sys 插件，需 trace_streamer）
 
-兼容:
-  - .ftrace     bytrace 文本输出
-  - .hitrace    hitrace 文本输出 (--text 模式)
-  - .ftrace.gz  压缩格式
-  - .hitrace.gz 压缩格式
+插件自动发现、自动匹配，详见 PLUGIN.md
 """
 
 import re
-import gzip
 import os
 from dataclasses import dataclass, field
 from typing import Iterator, Optional
 
-# 支持的文件扩展名
+# 支持的文件扩展名（用于错误提示）
 SUPPORTED_EXTENSIONS = {".ftrace", ".hitrace", ".ftrace.gz", ".hitrace.gz", ".sys", ".htrace"}
-
-# 二进制 hitrace 文件的魔数（protobuf 或 SysTace 头部）
-BINARY_SIGNATURES = [
-    b"\x0a",  # protobuf field 1 varint
-    b"\x0a\x08",  # 常见 trace packet 开头
-]
 
 
 @dataclass
@@ -164,170 +154,46 @@ def parse_line(line: str) -> Optional[TraceEvent]:
     )
 
 
-def _detect_format(filepath: str) -> str:
-    """检测 trace 文件格式：'text' (ftrace) 或 'binary' (protobuf/SysTace)"""
-    opener = gzip.open if filepath.endswith(".gz") else open
-    with opener(filepath, "rb") as f:
-        head = f.read(4)
-    # 文本格式以空白或 # 开头
-    if head and (head[0:1] in (b" ", b"\t", b"#") or head[0:1].isascii() and head[0:1].isalpha()):
-        return "text"
-    # 二进制格式检测（protobuf 开头）
-    for sig in BINARY_SIGNATURES:
-        if head.startswith(sig):
-            return "binary"
-    # 默认尝试按文本处理
-    return "text"
-
-
-def _raise_sys_guidance(filepath: str):
-    """针对 .sys/.htrace 文件给出转换指导"""
-    from .sys_parser import detect_trace_streamer
-
-    ts_path = detect_trace_streamer()
-    file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
-
-    guidance = [
-        f"检测到二进制 HiProfiler trace 文件: {filepath}",
-        f"文件大小: {file_size_mb:.1f} MB",
-        f"",
-    ]
-
-    if ts_path:
-        guidance.append(f"✅ 检测到 trace_streamer: {ts_path}")
-        guidance.append(f"   请使用以下命令转换：")
-        guidance.append(f"   trace_streamer {filepath} -e output.db")
-        guidance.append(f"   然后运行: pltrace analyze output.db")
-        guidance.append(f"")
-        guidance.append(f"   或直接运行: pltrace comprehensive {filepath}")
-        guidance.append(f"   (pltrace 将自动调用 trace_streamer 转换)")
-    else:
-        guidance.append(f"❌ 未检测到 trace_streamer")
-        guidance.append(f"   请安装 trace_streamer:")
-        guidance.append(f"   1. 下载: https://gitee.com/openharmony/developtools_smartperf_host/releases")
-        guidance.append(f"   2. 解压: unzip trace_streamer_binary.zip")
-        guidance.append(f"   3. 运行: ./trace_streamer {filepath} -e output.db")
-        guidance.append(f"")
-        guidance.append(f"   替代方案: 使用 bytrace 重新抓取文本格式 trace:")
-        guidance.append(f"   hdc shell \"bytrace -t 10 -b 16384 sched freq block disk > /data/local/tmp/trace.ftrace\"")
-        guidance.append(f"   hdc file recv /data/local/tmp/trace.ftrace .")
-
-    raise ValueError("\n".join(guidance))
-
-
-def _iter_from_sys(filepath: str, event_filter: Optional[set] = None) -> Iterator[TraceEvent]:
-    """从 .sys 二进制文件提取事件 - 自动调用 trace_streamer 转换"""
-    from .sys_parser import detect_trace_streamer, convert_sys_to_db, parse_sys_db
-
-    ts_path = detect_trace_streamer()
-    if not ts_path:
-        _raise_sys_guidance(filepath)
-        return  # unreachable due to raise
-
-    import sys as _sys
-    print(f"[pltrace] 检测到二进制 .sys 文件，使用 trace_streamer 自动转换...", file=_sys.stderr)
-    print(f"[pltrace] trace_streamer: {ts_path}", file=_sys.stderr)
-
-    import tempfile
-    db_path = tempfile.mktemp(suffix=".db", prefix="pltrace_")
-    try:
-        db_path = convert_sys_to_db(filepath, output_db=db_path, trace_streamer_bin=ts_path)
-        print(f"[pltrace] 转换完成: {db_path}", file=_sys.stderr)
-
-        event_count = 0
-        for ev in parse_sys_db(db_path):
-            if event_filter and ev.event_name not in event_filter:
-                continue
-            event_count += 1
-            yield ev
-
-        print(f"[pltrace] 从 SQLite 提取了 {event_count} 个事件", file=_sys.stderr)
-    finally:
-        # 清理临时数据库
-        try:
-            if os.path.exists(db_path):
-                os.unlink(db_path)
-        except OSError:
-            pass
-
-
 def iter_events(filepath: str, event_filter: Optional[set] = None) -> Iterator[TraceEvent]:
-    """流式读取 trace 文件，逐行返回 TraceEvent
+    """流式读取 trace 文件，自动匹配最佳插件解析
 
-    支持格式:
-      - .ftrace / .hitrace           文本格式
-      - .ftrace.gz / .hitrace.gz       gzip 压缩
-      - 自动检测文本/二进制，二进制会抛出 ValueError
+    支持格式（由插件系统自动发现）:
+      - .ftrace / .hitrace / .txt   → ftrace 插件
+      - .sys / .htrace              → sys 插件（需 trace_streamer）
+      - 用户自定义                  → ~/.pltrace/plugins/
 
     Args:
         filepath: trace 文件路径
         event_filter: 如果指定，只返回事件名在此集合内的记录
 
     Raises:
-        ValueError: 检测到二进制格式（需要使用 hitrace --text 转换）
         FileNotFoundError: 文件不存在
+        ValueError: 无匹配插件或解析失败
     """
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"文件不存在: {filepath}")
 
-    ext = os.path.splitext(filepath)[-1] if filepath.endswith(".gz") else os.path.splitext(filepath)[-1]
-    # 对 .gz 取双扩展名
-    if filepath.endswith(".gz"):
-        base = filepath[:-3]
-        ext = os.path.splitext(base)[-1] + ".gz"
+    from .plugins import find_plugin
 
-    if ext not in SUPPORTED_EXTENSIONS:
-        # 不做严格校验，允许用户传入任何扩展名（可能是符号链接等）
-        pass
-
-    is_sys = ext in {".sys", ".htrace"} or filepath.endswith(".sys") or filepath.endswith(".htrace")
-
-    fmt = _detect_format(filepath)
-    if fmt == "binary":
-        if is_sys:
-            # 尝试自动转换 .sys 文件
-            yield from _iter_from_sys(filepath, event_filter)
-            return
-        else:
-            raise ValueError(
-                f"检测到二进制格式 trace 文件: {filepath}\n"
-                f"二进制 .hitrace 文件不支持直接解析。请用以下命令转换为文本格式：\n"
-                f"  hitrace --text -o output.ftrace --trace_file {filepath}\n"
-                f"  或重新抓取: bytrace -t 10 -b 16384 sched freq block disk > trace.ftrace"
-            )
-
-    opener = gzip.open if filepath.endswith(".gz") else open
-    line_count = 0
-    with opener(filepath, "rt", encoding="utf-8", errors="replace") as f:
-        buf = ""
-        while True:
-            chunk = f.read(16 * 1024 * 1024)
-            if not chunk:
-                break
-            buf += chunk
-            lines = buf.split("\n")
-            buf = lines.pop()  # 最后一个不完整行保留
-            for line in lines:
-                ev = parse_line(line)
-                if ev is None:
-                    continue
-                if event_filter and ev.event_name not in event_filter:
-                    continue
-                line_count += 1
-                yield ev
-
-        # 处理最后一行
-        if buf.strip():
-            ev = parse_line(buf)
-            if ev and (not event_filter or ev.event_name in event_filter):
-                line_count += 1
-                yield ev
-
-    if line_count == 0:
+    plugin_cls = find_plugin(filepath)
+    if plugin_cls is None:
         raise ValueError(
-            f"未能从文件中解析到任何 trace 事件: {filepath}\n"
-            f"请确认文件是 bytrace/hitrace --text 输出的文本格式。"
+            f"无法识别 trace 文件格式: {filepath}\n"
+            f"支持的扩展名: {', '.join(sorted(SUPPORTED_EXTENSIONS))}\n"
+            f"使用 'pltrace plugins' 查看已安装的插件。"
         )
+
+    if not plugin_cls.is_available():
+        # 插件存在但依赖缺失，给出详细指导
+        if hasattr(plugin_cls, 'get_guidance'):
+            raise RuntimeError(plugin_cls.get_guidance(filepath))
+        ok, msg = plugin_cls.check_dependencies()
+        raise RuntimeError(
+            f"插件 '{plugin_cls.name}' 不可用: {msg}\n"
+            f"插件说明: {plugin_cls.description}"
+        )
+
+    yield from plugin_cls.iter_events(filepath, event_filter)
 
 
 def scan_events(filepath: str) -> dict:
