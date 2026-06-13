@@ -215,6 +215,42 @@ def _raise_sys_guidance(filepath: str):
     raise ValueError("\n".join(guidance))
 
 
+def _iter_from_sys(filepath: str, event_filter: Optional[set] = None) -> Iterator[TraceEvent]:
+    """从 .sys 二进制文件提取事件 - 自动调用 trace_streamer 转换"""
+    from .sys_parser import detect_trace_streamer, convert_sys_to_db, parse_sys_db
+
+    ts_path = detect_trace_streamer()
+    if not ts_path:
+        _raise_sys_guidance(filepath)
+        return  # unreachable due to raise
+
+    import sys as _sys
+    print(f"[pltrace] 检测到二进制 .sys 文件，使用 trace_streamer 自动转换...", file=_sys.stderr)
+    print(f"[pltrace] trace_streamer: {ts_path}", file=_sys.stderr)
+
+    import tempfile
+    db_path = tempfile.mktemp(suffix=".db", prefix="pltrace_")
+    try:
+        db_path = convert_sys_to_db(filepath, output_db=db_path, trace_streamer_bin=ts_path)
+        print(f"[pltrace] 转换完成: {db_path}", file=_sys.stderr)
+
+        event_count = 0
+        for ev in parse_sys_db(db_path):
+            if event_filter and ev.event_name not in event_filter:
+                continue
+            event_count += 1
+            yield ev
+
+        print(f"[pltrace] 从 SQLite 提取了 {event_count} 个事件", file=_sys.stderr)
+    finally:
+        # 清理临时数据库
+        try:
+            if os.path.exists(db_path):
+                os.unlink(db_path)
+        except OSError:
+            pass
+
+
 def iter_events(filepath: str, event_filter: Optional[set] = None) -> Iterator[TraceEvent]:
     """流式读取 trace 文件，逐行返回 TraceEvent
 
@@ -249,7 +285,9 @@ def iter_events(filepath: str, event_filter: Optional[set] = None) -> Iterator[T
     fmt = _detect_format(filepath)
     if fmt == "binary":
         if is_sys:
-            _raise_sys_guidance(filepath)
+            # 尝试自动转换 .sys 文件
+            yield from _iter_from_sys(filepath, event_filter)
+            return
         else:
             raise ValueError(
                 f"检测到二进制格式 trace 文件: {filepath}\n"
