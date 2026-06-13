@@ -49,7 +49,8 @@ class FtracePlugin(BaseFormatPlugin):
     def iter_events(cls, filepath: str, event_filter: Optional[set] = None) -> Iterator[TraceEvent]:
         """流式解析 ftrace 文本文件"""
         opener = gzip.open if filepath.endswith(".gz") else open
-        line_count = 0
+        filtered_count = 0
+        total_parsed = 0
 
         with opener(filepath, "rt", encoding="utf-8", errors="replace") as f:
             buf = ""
@@ -64,22 +65,28 @@ class FtracePlugin(BaseFormatPlugin):
                     ev = parse_line(line)
                     if ev is None:
                         continue
+                    total_parsed += 1
                     if event_filter and ev.event_name not in event_filter:
                         continue
-                    line_count += 1
+                    filtered_count += 1
                     yield ev
 
             if buf.strip():
                 ev = parse_line(buf)
-                if ev and (not event_filter or ev.event_name in event_filter):
-                    line_count += 1
-                    yield ev
+                if ev is not None:
+                    total_parsed += 1
+                    if not event_filter or ev.event_name in event_filter:
+                        filtered_count += 1
+                        yield ev
 
-        if line_count == 0:
+        if total_parsed == 0:
             raise ValueError(
                 f"未能从文件中解析到任何 ftrace 事件: {filepath}\n"
                 f"请确认文件是 bytrace/hitrace --text 输出的文本格式。"
             )
+        if filtered_count == 0 and event_filter:
+            # 所有事件被过滤掉（不是解析错误，是过滤条件太严格）
+            pass
 
     @classmethod
     def scan_info(cls, filepath: str) -> dict:
