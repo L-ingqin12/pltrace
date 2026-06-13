@@ -337,6 +337,26 @@ python3 sample/generate_demo_trace.py --scenario mixed      sample/demo_mixed.ft
 python3 -m pltrace.main analyze sample/demo_io.ftrace -o output/
 ```
 
+## 插件系统
+
+pltrace 采用插件架构支持多种 trace 格式。可以通过编写插件接入新的格式而不修改核心代码。
+
+```bash
+# 查看已安装的插件
+pltrace plugins
+```
+
+当前内置插件：
+
+| 插件 | 扩展名 | 依赖 |
+|------|--------|------|
+| `ftrace` | `.ftrace`, `.hitrace`, `.txt`, `.log` | 无 |
+| `sys` | `.sys`, `.htrace` | `trace_streamer` |
+
+自定义插件放入 `~/.pltrace/plugins/` 目录即可自动加载。
+
+👉 完整的插件开发指南、API 文档和示例代码见 **[PLUGIN.md](PLUGIN.md)**
+
 ## 许可
 
 MIT
