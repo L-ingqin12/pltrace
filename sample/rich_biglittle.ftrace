@@ -1,0 +1,36 @@
+# tracer: nop
+# scenario: biglittle_migration
+# events: 32
+#
+  <...>-    0     [000] ....  1000.001000: cpu_frequency: state=2200000 cpu_id=0
+  <...>-    0     [001] ....  1000.002000: cpu_frequency: state=2200000 cpu_id=1
+  <...>-    0     [002] ....  1000.003000: cpu_frequency: state=1200000 cpu_id=2
+  <...>-    0     [003] ....  1000.004000: cpu_frequency: state=1200000 cpu_id=3
+  app_main-10001     [000] ....  1000.005000: syscall_exit_openat: ret=3
+  app_main-10001     [000] ....  1000.008000: syscall_exit_mmap: ret=0x7f000000
+  app_main-10001     [000] ....  1000.011000: syscall_exit_mmap: ret=0x7f010000
+  app_main-10001     [000] ....  1000.014000: syscall_exit_mmap: ret=0x7f020000
+  app_main-10001     [000] ....  1000.017000: syscall_exit_mmap: ret=0x7f030000
+  app_main-10001     [000] ....  1000.020000: syscall_exit_mmap: ret=0x7f040000
+  app_main-10001     [000] ....  1000.022000: syscall_exit_openat: ret=4
+  app_main-10001     [000] ....  1000.027000: syscall_exit_openat: ret=5
+  app_main-10001     [000] d..2.  1000.029000: sched_switch: prev_comm=app_main prev_pid=10001 prev_prio=120 prev_state=0x0000 ==> next_comm=heavy_task next_pid=30001
+  swapper/2-    0     [002] d..2.  1000.030000: sched_waking: comm=app_main pid=10001 prio=120 target_cpu=2
+  swapper/2-    0     [002] d..2.  1000.031000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=app_main next_pid=10001
+  <...>-    0     [002] ....  1000.036000: cpu_frequency: state=800000 cpu_id=2
+  app_main-10001     [002] ....  1000.046000: syscall_exit_mmap: ret=0x7f050000
+  app_main-10001     [002] ....  1000.056000: syscall_exit_mmap: ret=0x7f060000
+  app_main-10001     [002] ....  1000.066000: syscall_exit_mmap: ret=0x7f070000
+  app_main-10001     [002] ....  1000.076000: syscall_exit_mmap: ret=0x7f080000
+  app_main-10001     [002] ....  1000.086000: syscall_exit_mmap: ret=0x7f090000
+  app_main-10001     [002] ....  1000.096000: syscall_exit_mmap: ret=0x7f100000
+  app_main-10001     [002] ....  1000.106000: syscall_exit_mmap: ret=0x7f110000
+  app_main-10001     [002] ....  1000.116000: syscall_exit_mmap: ret=0x7f120000
+  <...>-    0     [002] ....  1000.126000: cpu_frequency: state=600000 cpu_id=2
+  app_main-10001     [002] d..2.  1000.128000: sched_switch: prev_comm=app_main prev_pid=10001 prev_prio=120 prev_state=0x0002 ==> next_comm=swapper/2 next_pid=0
+  mmcqd/0-   89     [002] ....  1000.129000: block_rq_issue: dev=179,0 sector=3000 nr_sector=8 rw=0 comm=mmcqd
+  mmcqd/0-   89     [002] ....  1000.154000: block_rq_complete: dev=179,0 sector=3000 nr_sector=8 rw=0
+  swapper/2-    0     [002] d..2.  1000.155000: sched_waking: comm=app_main pid=10001 prio=120 target_cpu=2
+  swapper/2-    0     [002] d..2.  1000.156000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=app_main next_pid=10001
+  app_main-10001     [002] ....  1000.161000: syscall_exit_openat: ret=6
+  idle_task-    0     [001] ....  1000.162000: syscall_exit_read: ret=0

@@ -28,6 +28,12 @@ python3 -m pltrace.main <command> [args...]
 
 # 4. 细粒度切片（10ms 每片）
 ./run_pltrace.sh slice trace.ftrace --gap-id 3 --size 10
+
+# 5. 全维度综合分析（8 个维度）
+./run_pltrace.sh comprehensive trace.ftrace
+
+# 6. 模板化分析
+./run_pltrace.sh template trace.ftrace --template dlopen
 ```
 
 ## 命令说明
@@ -61,6 +67,41 @@ pltrace analyze <trace_file> [--thread NAME] [--pid PID] [--gap-id N] [--output-
 - **CPU 频率**：间隙内的平均/最低/最高频率
 - **时间线切片**：50ms 粒度切片，标注异常片
 - **结论**：主导因素 + 置信度
+
+### `comprehensive` - 全维度综合分析 🆕
+
+```
+pltrace comprehensive <trace_file> [--output FILE]
+```
+
+从 **8 个维度** 全面扫描 trace 文件，自动发现性能与调度问题：
+
+| 维度 | 分析内容 |
+|------|---------|
+| 🖥️ 调度分析 | 上下文切换、抢占率、D/S/R 状态分布 |
+| ⚡ CPU 拓扑 | big.LITTLE 集群检测、降频/温控检测 |
+| 💾 I/O 分析 | block 层延迟 (avg/p99/max)、IOPS |
+| 🔒 锁竞争 | futex 调用失败率 |
+| 📡 IPC | Binder 事务频率 |
+| ⚡ 中断 | IRQ/softIRQ 率和风暴检测 |
+| 🧠 内存 | mmap/brk/缺页统计 |
+| 🔗 唤醒链 | 唤醒者关系和延迟 |
+
+每个发现按严重度分级 (❌ critical / ⚠️ warning / ℹ️ info)，附带具体建议。
+
+### `template` - 模板化分析 🆕
+
+```
+pltrace template <trace_file> --template {dlopen|startup|frame} [-t THREAD]
+```
+
+预定义性能分析模板：
+
+| 模板 | 说明 |
+|------|------|
+| `dlopen` | dlopen 耗时分布、瓶颈分类、异常检测、综合评分 |
+| `startup` | 应用启动阶段分解（进程创建→初始化→渲染准备） |
+| `frame` | 帧率抖动分析（丢帧率、帧间隔统计） |
 
 ### `slice` - 细粒度切片
 

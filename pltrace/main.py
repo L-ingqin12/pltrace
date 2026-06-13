@@ -36,6 +36,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pltrace.parser import scan_events
 from pltrace.analyzer import find_gaps, analyze_gap, split_gap_into_slices
 from pltrace.reporter import generate_summary_report, generate_gap_report, export_gap_json
+from pltrace.comprehensive import run_comprehensive_analysis
+from pltrace.templates import TEMPLATES
 
 
 def _resolve_target(args):
@@ -233,19 +235,89 @@ def cmd_slice(args):
         print(f"\n  子切片数据已导出: {args.output}")
 
 
+def cmd_comprehensive(args):
+    """全维度综合分析"""
+    print(f"全维度分析: {args.trace_file}")
+    t0 = time.perf_counter()
+    report = run_comprehensive_analysis(args.trace_file)
+    elapsed = time.perf_counter() - t0
+
+    d = report.to_dict()
+    print(f"全局评分: {d['global_score']}")
+    print(f"发现问题: {d['total_findings']} 个 (严重: {d['critical_count']}, 警告: {d['warning_count']})")
+    print(f"摘要: {d['executive_summary']}")
+    print()
+
+    for dim_name, dim_data in d["dimensions"].items():
+        if dim_data is None:
+            continue
+        print(f"── {dim_name} ──")
+        print(f"  {dim_data['summary']}")
+        for f in dim_data["findings"]:
+            badge = {"critical": "❌", "warning": "⚠️", "info": "ℹ️"}.get(f["severity"], "")
+            print(f"  {badge} [{f['severity']}] {f['title']}")
+            print(f"     {f['detail'][:120]}")
+            if f.get("recommendation"):
+                print(f"     💡 {f['recommendation'][:120]}")
+        print()
+
+    if d["top_recommendations"]:
+        print("── 优先建议 ──")
+        for i, rec in enumerate(d["top_recommendations"], 1):
+            print(f"  {i}. {rec}")
+
+    if args.output:
+        import json
+        with open(args.output, "w") as f:
+            json.dump(d, f, indent=2, ensure_ascii=False, default=str)
+        print(f"\n  JSON报告已导出: {args.output}")
+
+    print(f"\n总耗时 {elapsed:.1f}s")
+
+
+def cmd_template(args):
+    """模板化分析"""
+    template_name = args.template
+    if template_name not in TEMPLATES:
+        print(f"未知模板: {template_name}。可用: {list(TEMPLATES.keys())}")
+        return
+
+    kwargs = {"trace_path": args.trace_file}
+    if template_name in ("dlopen", "startup"):
+        kwargs["target_comm"] = args.thread
+    if template_name == "frame":
+        kwargs["render_thread"] = args.render_thread or "RSMainThread"
+        kwargs["app_thread"] = args.thread
+
+    result = TEMPLATES[template_name](**kwargs)
+    print(f"=== 模板分析: {template_name} ===")
+    print(f"评分: {result.overall_score}")
+    print(f"摘要: {result.summary}")
+    print()
+    if result.findings:
+        print("── 发现 ──")
+        for f in result.findings:
+            print(f"  • {f}")
+        print()
+    if result.recommendations:
+        print("── 建议 ──")
+        for r in result.recommendations:
+            print(f"  💡 {r}")
+    if result.detail:
+        print(f"\n{result.detail}")
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="pltrace - 鸿蒙 ftrace 间隙分析工具",
+        description="pltrace - 鸿蒙 ftrace/hitrace 全维度性能分析工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
   pltrace scan trace.ftrace                       # 扫描：查看有哪些线程和事件
   pltrace gaps trace.ftrace                       # 查找所有 dlopen 间隙
-  pltrace gaps trace.ftrace --thread dlopen_th    # 按线程名过滤
-  pltrace gaps trace.ftrace --pid 12345           # 按 PID 过滤
-  pltrace analyze trace.ftrace -t dlopen_th       # 完整分析
-  pltrace analyze trace.ftrace --gap-id 3         # 只分析第 3 个 gap
-  pltrace slice trace.ftrace --gap-id 3 --size 10 # 10ms 粒度切割
+  pltrace analyze trace.ftrace -t dlopen_th       # 完整分析单个 gap
+  pltrace comprehensive trace.ftrace              # 全维度综合分析 (8维度)
+  pltrace template trace.ftrace --template dlopen # 模板分析
 """,
     )
     sub = parser.add_subparsers(dest="command")
@@ -281,6 +353,19 @@ def main():
     p_slice.add_argument("--size", type=int, default=20, help="子切片大小 (ms, 默认 20)")
     p_slice.add_argument("--output", "-o", help="JSON 导出路径")
 
+    # comprehensive
+    p_comp = sub.add_parser("comprehensive", help="全维度综合分析 (8维度) — 调度/CPU/IO/锁/IPC/中断/内存/唤醒")
+    p_comp.add_argument("trace_file", help="trace 文件路径")
+    p_comp.add_argument("--output", "-o", help="JSON 报告导出路径")
+
+    # template
+    p_tmpl = sub.add_parser("template", help="模板化分析 — dlopen耗时/启动分析/帧率抖动")
+    p_tmpl.add_argument("trace_file", help="trace 文件路径")
+    p_tmpl.add_argument("--template", "-T", required=True, choices=["dlopen", "startup", "frame"],
+                        help="分析模板: dlopen | startup | frame")
+    p_tmpl.add_argument("--thread", "-t", help="目标线程名")
+    p_tmpl.add_argument("--render-thread", help="渲染线程名 (frame 模板, 默认 RSMainThread)")
+
     args = parser.parse_args()
 
     if args.command == "scan":
@@ -291,6 +376,10 @@ def main():
         cmd_analyze(args)
     elif args.command == "slice":
         cmd_slice(args)
+    elif args.command == "comprehensive":
+        cmd_comprehensive(args)
+    elif args.command == "template":
+        cmd_template(args)
     else:
         parser.print_help()
 

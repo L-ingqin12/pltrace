@@ -1,0 +1,35 @@
+# tracer: nop
+# scenario: binder_ipc
+# events: 31
+#
+  <...>-    0     [000] ....  1000.001000: cpu_frequency: state=2000000 cpu_id=0
+  app_main-11111     [000] ....  1000.002000: syscall_exit_openat: ret=3
+  binder-11111     [000] ....  1000.005000: binder_transaction: transaction=1 from_pid=11111 to_pid=22222
+  binder-22222     [000] ....  1000.013000: binder_transaction: transaction=1 from_pid=22222 to_pid=11111
+  app_main-11111     [000] ....  1000.015000: syscall_exit_page_fault: ret=0
+  app_main-11111     [000] d..2.  1000.016000: sched_switch: prev_comm=app_main prev_pid=11111 prev_prio=120 prev_state=0x0002 ==> next_comm=swapper/2 next_pid=0
+  mmcqd/0-   89     [000] ....  1000.017000: block_rq_issue: dev=179,0 sector=5000 nr_sector=4 rw=0 comm=mmcqd
+  mmcqd/0-   89     [000] ....  1000.029000: block_rq_complete: dev=179,0 sector=5000 nr_sector=4 rw=0
+  swapper/2-    0     [000] d..2.  1000.030000: sched_waking: comm=app_main pid=11111 prio=120 target_cpu=0
+  swapper/2-    0     [000] d..2.  1000.031000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=app_main next_pid=11111
+  app_main-11111     [000] ....  1000.033000: syscall_exit_mmap: ret=0x7f000000
+  app_main-11111     [000] ....  1000.035000: syscall_exit_mmap: ret=0x7f010000
+  app_main-11111     [000] ....  1000.037000: syscall_exit_mmap: ret=0x7f020000
+  app_main-11111     [000] ....  1000.039000: syscall_exit_mmap: ret=0x7f030000
+  <...>-    0     [000] ....  1000.039500: irq_handler_entry: irq=100 name=irq_dev0
+  <...>-    0     [000] ....  1000.039600: irq_handler_exit: irq=100 ret=handled
+  <...>-    0     [000] ....  1000.040100: irq_handler_entry: irq=101 name=irq_dev1
+  <...>-    0     [000] ....  1000.040200: irq_handler_exit: irq=101 ret=handled
+  <...>-    0     [000] ....  1000.040700: irq_handler_entry: irq=102 name=irq_dev2
+  <...>-    0     [000] ....  1000.040800: irq_handler_exit: irq=102 ret=handled
+  <...>-    0     [000] ....  1000.041300: irq_handler_entry: irq=103 name=irq_dev3
+  <...>-    0     [000] ....  1000.041400: irq_handler_exit: irq=103 ret=handled
+  <...>-    0     [000] ....  1000.041900: irq_handler_entry: irq=104 name=irq_dev4
+  <...>-    0     [000] ....  1000.042000: irq_handler_exit: irq=104 ret=handled
+  <...>-    0     [000] ....  1000.042500: irq_handler_entry: irq=105 name=irq_dev5
+  <...>-    0     [000] ....  1000.042600: irq_handler_exit: irq=105 ret=handled
+  <...>-    0     [000] ....  1000.043100: irq_handler_entry: irq=106 name=irq_dev6
+  <...>-    0     [000] ....  1000.043200: irq_handler_exit: irq=106 ret=handled
+  <...>-    0     [000] ....  1000.043700: irq_handler_entry: irq=107 name=irq_dev7
+  <...>-    0     [000] ....  1000.043800: irq_handler_exit: irq=107 ret=handled
+  app_main-11111     [000] ....  1000.046800: syscall_exit_openat: ret=5

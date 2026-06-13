@@ -56,6 +56,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pltrace.parser import scan_events
 from pltrace.analyzer import find_gaps, analyze_gap, split_gap_into_slices
 from pltrace.reporter import generate_gap_report
+from pltrace.comprehensive import run_comprehensive_analysis
+from pltrace.correlator import analyze_correlation
+from pltrace.templates import TEMPLATES
 
 VERSION = "1.0.0"
 SERVER_NAME = "pltrace-mcp"
@@ -148,6 +151,72 @@ TOOLS = [
             "required": ["trace_file", "gap_id"],
         },
     },
+    {
+        "name": "trace_comprehensive",
+        "description": (
+            "【全维度综合分析】扫描整个 trace 文件，从 8 个维度全面检测性能与调度问题：\n"
+            "1. 调度分析 — 线程状态分布、抢占率、D 状态占比\n"
+            "2. CPU 拓扑 — big.LITTLE 集群识别、降频检测\n"
+            "3. I/O 分析 — block 层延迟（avg/p99/max）、IOPS\n"
+            "4. 锁竞争 — futex 失败率\n"
+            "5. IPC — Binder 事务频率\n"
+            "6. 中断 — IRQ/softIRQ 率\n"
+            "7. 内存 — mmap/缺页计数\n"
+            "8. 唤醒链 — 唤醒者分析\n\n"
+            "返回结构化报告，包含 findings（按严重度分级）、stats、recommendations。"
+            "适合 AI 直接消费做出判断。"
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "trace_file": {"type": "string", "description": "trace 文件路径"},
+            },
+            "required": ["trace_file"],
+        },
+    },
+    {
+        "name": "trace_correlate",
+        "description": (
+            "【多线程关联分析】分析目标线程间隙期间，同一 CPU 上其他线程的竞争情况。"
+            "输出：竞争者排名（按占用时间）、CPU 利用率、抢占者列表、"
+            "跨 CPU 迁移机会（是否有空闲大核可调度）。"
+            "模拟 HiSmartPerf 泳道图的交叉分析能力。"
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "trace_file": {"type": "string", "description": "trace 文件路径"},
+                "gap_id": {"type": "integer", "description": "间隙 ID"},
+                "thread": {"type": "string", "description": "目标线程名"},
+                "pid": {"type": "integer", "description": "目标线程 PID"},
+            },
+            "required": ["trace_file", "gap_id"],
+        },
+    },
+    {
+        "name": "trace_template",
+        "description": (
+            "【模板化分析】使用预定义模板分析常见性能场景：\n"
+            "- dlopen: 分析所有 dlopen 调用的耗时分布、瓶颈分类、异常检测\n"
+            "- startup: 应用启动阶段分解（进程创建→初始化→渲染准备）\n"
+            "- frame: 帧率抖动分析（丢帧率、帧间隔统计）\n"
+            "分析结果含综合评分 (GOOD/WARNING/CRITICAL) 和具体建议。"
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "trace_file": {"type": "string", "description": "trace 文件路径"},
+                "template": {
+                    "type": "string",
+                    "description": "模板名: dlopen | startup | frame",
+                    "enum": ["dlopen", "startup", "frame"],
+                },
+                "thread": {"type": "string", "description": "目标线程名（dlopen/startup 场景）"},
+                "render_thread": {"type": "string", "description": "渲染线程名（frame 场景，默认 RSMainThread）"},
+            },
+            "required": ["trace_file", "template"],
+        },
+    },
 ]
 
 
@@ -231,11 +300,135 @@ def _tool_slice_gap(args: dict) -> str:
     return "\n".join(lines)
 
 
+def _tool_comprehensive(args: dict) -> str:
+    trace_file = args["trace_file"]
+    if not os.path.exists(trace_file):
+        return f"错误: 文件不存在: {trace_file}"
+    report = run_comprehensive_analysis(trace_file)
+    d = report.to_dict()
+    lines = [
+        f"=== 全维度综合分析: {trace_file} ===",
+        f"全局评分: {d['global_score']}",
+        f"发现问题: {d['total_findings']} 个 (严重: {d['critical_count']}, 警告: {d['warning_count']})",
+        f"追踪跨度: {d['trace_span_ms']:.1f}ms, 事件总数: {d['total_events']:,}",
+        f"摘要: {d['executive_summary']}",
+        f"",
+    ]
+    for dim_name, dim_data in d["dimensions"].items():
+        if dim_data is None:
+            continue
+        lines.append(f"── {dim_name} ──")
+        lines.append(f"  {dim_data['summary']}")
+        for f in dim_data["findings"]:
+            badge = {"critical": "❌", "warning": "⚠️", "info": "ℹ️"}.get(f["severity"], "")
+            lines.append(f"  {badge} [{f['severity']}] {f['title']}")
+            lines.append(f"     {f['detail']}")
+            if f["recommendation"]:
+                lines.append(f"     💡 {f['recommendation']}")
+        lines.append("")
+    if d["top_recommendations"]:
+        lines.append("── 优先建议 ──")
+        for i, rec in enumerate(d["top_recommendations"], 1):
+            lines.append(f"  {i}. {rec}")
+    return "\n".join(lines)
+
+
+def _tool_correlate(args: dict) -> str:
+    trace_file = args["trace_file"]
+    gap_id = args["gap_id"]
+    thread = args.get("thread")
+    pid = args.get("pid")
+
+    gaps = find_gaps(trace_file, target_comm=thread, target_pid=pid)
+    target = next((g for g in gaps if g.gap_id == gap_id), None)
+    if target is None:
+        return f"未找到 gap_id={gap_id}"
+
+    cr = analyze_correlation(
+        trace_file,
+        start_us=target.before_ts * 1_000_000,
+        end_us=target.after_ts * 1_000_000,
+        target_pid=target.pid,
+        target_comm=target.thread,
+    )
+
+    lines = [
+        f"=== 多线程关联分析: Gap #{gap_id} ===",
+        f"目标: {target.thread} (PID={target.pid}) CPU{cr.target_cpu}",
+        f"间隙: {cr.total_duration_us/1000:.2f}ms",
+        f"",
+    ]
+    if cr.contention:
+        c = cr.contention
+        lines.append(f"── CPU{c.cpu} 竞争分析 ──")
+        lines.append(f"  其他线程占用: {c.total_other_running_us/1000:.2f}ms ({c.contention_pct:.1f}%)")
+        if c.top_contenders:
+            lines.append(f"  竞争者排名:")
+            for comm, pid, dur in c.top_contenders[:5]:
+                lines.append(f"    - {comm} (PID={pid}): {dur/1000:.2f}ms")
+
+    if cr.all_threads:
+        lines.append(f"\n── 全局线程活动排名 (前5) ──")
+        for t in cr.all_threads[:5]:
+            lines.append(f"  - {t.comm} (PID={t.pid}): {t.running_us/1000:.2f}ms on CPU{list(t.cpu_list)}")
+
+    if cr.cross_cpu and cr.cross_cpu.idle_cpus_during_runnable:
+        lines.append(f"\n── 跨 CPU 迁移机会 ──")
+        lines.append(f"  目标在 Runnable 期间有空闲 CPU: {cr.cross_cpu.idle_cpus_during_runnable}")
+        lines.append(f"  💡 建议: 将目标线程绑定到大核或使用 WALT 调度")
+
+    if cr.anomaly_markers:
+        lines.append(f"\n── 异常标记 ──")
+        for s, e, label in cr.anomaly_markers:
+            lines.append(f"  ⚠ [{s/1000:.1f}-{e/1000:.1f}ms] {label}")
+
+    return "\n".join(lines)
+
+
+def _tool_template(args: dict) -> str:
+    trace_file = args["trace_file"]
+    template_name = args["template"]
+
+    if template_name not in TEMPLATES:
+        return f"未知模板: {template_name}。可用: {list(TEMPLATES.keys())}"
+
+    kwargs = {"trace_path": trace_file}
+    if template_name in ("dlopen", "startup"):
+        kwargs["target_comm"] = args.get("thread")
+    if template_name == "frame":
+        kwargs["render_thread"] = args.get("render_thread", "RSMainThread")
+        kwargs["app_thread"] = args.get("thread")
+
+    result = TEMPLATES[template_name](**kwargs)
+
+    lines = [
+        f"=== 模板分析: {template_name} ===",
+        f"评分: {result.overall_score}",
+        f"摘要: {result.summary}",
+        f"",
+    ]
+    if result.findings:
+        lines.append("── 发现 ──")
+        for f in result.findings:
+            lines.append(f"  • {f}")
+        lines.append("")
+    if result.recommendations:
+        lines.append("── 建议 ──")
+        for r in result.recommendations:
+            lines.append(f"  💡 {r}")
+    if result.detail:
+        lines.append(f"\n{result.detail}")
+    return "\n".join(lines)
+
+
 TOOL_HANDLERS = {
     "trace_scan": _tool_scan,
     "trace_find_gaps": _tool_find_gaps,
     "trace_analyze_gap": _tool_analyze_gap,
     "trace_slice_gap": _tool_slice_gap,
+    "trace_comprehensive": _tool_comprehensive,
+    "trace_correlate": _tool_correlate,
+    "trace_template": _tool_template,
 }
 
 

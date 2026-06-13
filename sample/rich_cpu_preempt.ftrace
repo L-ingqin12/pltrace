@@ -1,0 +1,54 @@
+# tracer: nop
+# scenario: cpu_preempt
+# events: 50
+#
+  <...>-    0     [000] ....  1000.001000: cpu_frequency: state=2200000 cpu_id=0
+  <...>-    0     [001] ....  1000.002000: cpu_frequency: state=2200000 cpu_id=1
+  <...>-    0     [002] ....  1000.003000: cpu_frequency: state=1200000 cpu_id=2
+  <...>-    0     [003] ....  1000.004000: cpu_frequency: state=1200000 cpu_id=3
+  critical_thread-10001     [000] ....  1000.005000: syscall_exit_openat: ret=3
+  critical_thread-10001     [000] d..2.  1000.007000: sched_switch: prev_comm=critical_thread prev_pid=10001 prev_prio=120 prev_state=0x0000 ==> next_comm=render next_pid=30001
+  render-30001     [000] ....  1000.012000: syscall_exit_write: ret=4096
+  render-30001     [000] ....  1000.017000: syscall_exit_write: ret=4096
+  render-30001     [000] ....  1000.022000: syscall_exit_write: ret=4096
+  render-30001     [000] ....  1000.027000: syscall_exit_write: ret=4096
+  render-30001     [000] ....  1000.032000: syscall_exit_write: ret=4096
+  render-30001     [000] ....  1000.037000: syscall_exit_write: ret=4096
+  render-30001     [000] d..2.  1000.038000: sched_switch: prev_comm=render prev_pid=30001 prev_prio=120 prev_state=0x0001 ==> next_comm=critical_thread next_pid=10001
+  critical_thread-10001     [000] ....  1000.041000: syscall_exit_mmap: ret=0x7f000000
+  critical_thread-10001     [000] d..2.  1000.042000: sched_switch: prev_comm=critical_thread prev_pid=10001 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker1 next_pid=20001
+  bg_worker1-20001     [000] ....  1000.047000: syscall_exit_write: ret=4096
+  bg_worker1-20001     [000] ....  1000.052000: syscall_exit_write: ret=4096
+  bg_worker1-20001     [000] ....  1000.057000: syscall_exit_write: ret=4096
+  bg_worker1-20001     [000] ....  1000.062000: syscall_exit_write: ret=4096
+  bg_worker1-20001     [000] d..2.  1000.063000: sched_switch: prev_comm=bg_worker1 prev_pid=20001 prev_prio=120 prev_state=0x0001 ==> next_comm=critical_thread next_pid=10001
+  bg_worker2-20002     [001] ....  1000.066000: syscall_exit_write: ret=4096
+  bg_worker2-20002     [001] ....  1000.069000: syscall_exit_write: ret=4096
+  bg_worker2-20002     [001] ....  1000.072000: syscall_exit_write: ret=4096
+  critical_thread-10001     [000] ....  1000.077000: syscall_exit_openat: ret=4
+  swapper/2-    0     [000] d..2.  1000.079000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker1 next_pid=20001
+  bg_worker1-20001     [000] ....  1000.080000: syscall_exit_read: ret=1024
+  swapper/2-    0     [000] d..2.  1000.082000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker2 next_pid=20002
+  bg_worker2-20002     [000] ....  1000.083000: syscall_exit_read: ret=1024
+  swapper/2-    0     [000] d..2.  1000.085000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker3 next_pid=20003
+  bg_worker3-20003     [000] ....  1000.086000: syscall_exit_read: ret=1024
+  swapper/2-    0     [001] d..2.  1000.088000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker1 next_pid=20001
+  bg_worker1-20001     [001] ....  1000.089000: syscall_exit_read: ret=1024
+  swapper/2-    0     [001] d..2.  1000.091000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker2 next_pid=20002
+  bg_worker2-20002     [001] ....  1000.092000: syscall_exit_read: ret=1024
+  swapper/2-    0     [001] d..2.  1000.094000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker3 next_pid=20003
+  bg_worker3-20003     [001] ....  1000.095000: syscall_exit_read: ret=1024
+  swapper/2-    0     [002] d..2.  1000.097000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker1 next_pid=20001
+  bg_worker1-20001     [002] ....  1000.098000: syscall_exit_read: ret=1024
+  swapper/2-    0     [002] d..2.  1000.100000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker2 next_pid=20002
+  bg_worker2-20002     [002] ....  1000.101000: syscall_exit_read: ret=1024
+  swapper/2-    0     [002] d..2.  1000.103000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker3 next_pid=20003
+  bg_worker3-20003     [002] ....  1000.104000: syscall_exit_read: ret=1024
+  swapper/2-    0     [003] d..2.  1000.106000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker1 next_pid=20001
+  bg_worker1-20001     [003] ....  1000.107000: syscall_exit_read: ret=1024
+  swapper/2-    0     [003] d..2.  1000.109000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker2 next_pid=20002
+  bg_worker2-20002     [003] ....  1000.110000: syscall_exit_read: ret=1024
+  swapper/2-    0     [003] d..2.  1000.112000: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=0x0000 ==> next_comm=bg_worker3 next_pid=20003
+  bg_worker3-20003     [003] ....  1000.113000: syscall_exit_read: ret=1024
+  <...>-    0     [002] ....  1000.123000: cpu_frequency: state=800000 cpu_id=2
+  <...>-    0     [003] ....  1000.124000: cpu_frequency: state=800000 cpu_id=3
